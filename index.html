@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Picture Mood Detector</title>
+    <link
+      href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css?family=Roboto"
+      rel="stylesheet"
+    />
+    <style>
+      /* Reset and Base Styles */
+      html,
+      body,
+      * {
+        box-sizing: border-box;
+        font-size: 16px;
+      }
+
+      html,
+      body {
+        height: 100%;
+        text-align: center;
+        margin: 0;
+      }
+
+      body {
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #4b7ca2 100%);
+        font-family: "Roboto", sans-serif;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-family: "Roboto", sans-serif;
+        font-size: 42px;
+        color: white;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .subtitle {
+        font-family: "Roboto", sans-serif;
+        font-size: 18px;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 2rem;
+      }
+
+      h2 {
+        font-family: "Roboto", sans-serif;
+        font-size: 24px;
+        line-height: 1;
+        color: #454cad;
+        margin-bottom: 1rem;
+        margin-top: 2rem;
+      }
+
+      p {
+        font-family: "Roboto", sans-serif;
+        font-size: 16px;
+        color: #5f6982;
+      }
+
+      /* Upload Section */
+      .uploader {
+        display: block;
+        clear: both;
+        margin: 0 auto 2rem auto;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .uploader label {
+        display: block;
+        width: 100%;
+        padding: 3rem 1.5rem;
+        text-align: center;
+        background: #fff;
+        border-radius: 12px;
+        border: 3px dashed #ddd;
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      .uploader label:hover {
+        border-color: #454cad;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(69, 76, 173, 0.2);
+      }
+
+      .uploader label.hover {
+        border: 3px solid #454cad;
+        background: #f8f8ff;
+      }
+
+      .uploader #start i.fa {
+        font-size: 50px;
+        margin-bottom: 1rem;
+        color: #454cad;
+        transition: all 0.2s ease-in-out;
+      }
+
+      .uploader input[type="file"] {
+        display: none;
+      }
+
+      #file-image {
+        max-width: 300px;
+        max-height: 300px;
+        border-radius: 8px;
+        margin: 1rem auto;
+        display: block;
+      }
+
+      #file-image.hidden {
+        display: none;
+      }
+
+      /* Artist Input Section */
+      .artist-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .artist-inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .artist-input {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid #eee;
+        border-radius: 8px;
+        font-size: 16px;
+        font-family: "Roboto", sans-serif;
+        transition: all 0.3s ease;
+      }
+
+      .artist-input:focus {
+        outline: none;
+        border-color: #454cad;
+        box-shadow: 0 0 0 3px rgba(69, 76, 173, 0.1);
+      }
+
+      .artist-input::placeholder {
+        color: #aaa;
+      }
+
+      /* Button */
+      .analyze-btn {
+        display: inline-block;
+        margin: 1.5rem auto;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 18px;
+        text-decoration: none;
+        border: none;
+        border-radius: 25px;
+        outline: none;
+        padding: 1rem 3rem;
+        color: #fff;
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      .analyze-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+      }
+
+      .analyze-btn:active {
+        transform: translateY(0);
+      }
+
+      .analyze-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .analyze-btn.loading {
+        opacity: 0.7;
+        cursor: wait;
+      }
+
+      /* Results Section */
+      .results-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-top: 2rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        display: none;
+      }
+
+      .results-section.show {
+        display: block;
+        animation: fadeIn 0.5s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .mood-result {
+        background: #f8f8ff;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+      }
+
+      .mood-result h3 {
+        color: #454cad;
+        margin-top: 0;
+      }
+
+      .song-list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .song-item {
+        background: #f8f8ff;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        text-align: left;
+        border-left: 4px solid #454cad;
+        transition: all 0.3s ease;
+      }
+
+      .song-item:hover {
+        background: #e8e8ff;
+        transform: translateX(5px);
+      }
+
+      .song-title {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.25rem;
+      }
+
+      .song-artist {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .spotify-link {
+        display: inline-block;
+        margin-top: 0.5rem;
+        color: #1db954;
+        text-decoration: none;
+        font-size: 13px;
+      }
+
+      .spotify-link:hover {
+        text-decoration: underline;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎵 Picture Mood Detector</h1>
+      <p class="subtitle">
+        Upload your photo, tell us your vibe, get the perfect soundtrack
+      </p>
+
+      <!-- Image Upload Section -->
+      <div class="uploader">
+        <label for="file-upload">
+          <div id="start">
+            <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+            <div>Click or drag your image here</div>
+            <div style="font-size: 14px; color: #aaa; margin-top: 0.5rem">
+              JPG, PNG, or GIF
+            </div>
+          </div>
+          <img id="file-image" class="hidden" alt="Uploaded preview" />
+        </label>
+        <input id="file-upload" type="file" accept="image/*" />
+      </div>
+
+      <!-- Artist Input Section -->
+      <div class="artist-section">
+        <h2>🎤 Your Favorite Artists</h2>
+        <p>
+          Tell us your top 3 artists for personalized recommendations (optional)
+        </p>
+        <div class="artist-inputs">
+          <input
+            type="text"
+            class="artist-input"
+            id="artist1"
+            placeholder="Artist #1 (e.g., Taylor Swift)"
+          />
+          <input
+            type="text"
+            class="artist-input"
+            id="artist2"
+            placeholder="Artist #2 (e.g., The Weeknd)"
+          />
+          <input
+            type="text"
+            class="artist-input"
+            id="artist3"
+            placeholder="Artist #3 (e.g., Billie Eilish)"
+          />
+        </div>
+
+        <div
+          style="
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              cursor: pointer;
+              font-size: 14px;
+              color: #5f6982;
+            "
+          >
+            <input
+              type="checkbox"
+              id="surprise-mode"
+              style="width: auto; margin-right: 0.5rem"
+            />
+            Or just surprise me with mood-matching songs!
+          </label>
+        </div>
+      </div>
+
+      <!-- Analyze Button -->
+      <button class="analyze-btn" id="analyze-btn" disabled>
+        ✨ Analyze & Get Recommendations
+      </button>
+
+      <!-- Results Section (Hidden Initially) -->
+      <div class="results-section" id="results">
+        <h2>🎯 Your Perfect Soundtrack</h2>
+
+        <div class="mood-result">
+          <h3>Detected Mood: <span id="mood-text">Analyzing...</span></h3>
+          <p id="mood-description">Getting your vibe...</p>
+        </div>
+
+        <h3 style="text-align: left; color: #454cad">Recommended Songs:</h3>
+        <ul class="song-list" id="song-list">
+          <!-- Songs will be added here dynamically -->
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      // ⚠️ Your API Keys
+      const SPOTIFY_CLIENT_ID = "3a72c2c41f06421a84b47252b4f77e01";
+      const SPOTIFY_CLIENT_SECRET = "4df125be91034342aa36fdbe578af679"; // Add your Spotify secret here
+      const GOOGLE_VISION_API_KEY = "AIzaSyASgk4x58RuQGYXFoBjTqLo48O5T0eo4HI";
+
+      // Spotify access token
+      let spotifyAccessToken = null;
+
+      // Get Spotify token using Client Credentials (server-to-server, no user login needed)
+      async function getSpotifyToken() {
+        try {
+          const response = await fetch(
+            "https://accounts.spotify.com/api/token",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization:
+                  "Basic " +
+                  btoa(SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET),
+              },
+              body: "grant_type=client_credentials",
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.access_token) {
+            spotifyAccessToken = data.access_token;
+            console.log("✅ Spotify token obtained!");
+            return true;
+          } else {
+            console.error("Failed to get token:", data);
+            return false;
+          }
+        } catch (error) {
+          console.error("Error getting Spotify token:", error);
+          return false;
+        }
+      }
+
+      // Get recommendations from Spotify based on mood (searches mood playlists)
+      async function getRecommendationsByMood(mood) {
+        if (!spotifyAccessToken) {
+          await getSpotifyToken();
+        }
+
+        try {
+          // Search for mood-based playlists
+          const moodSearchTerms = {
+            happy: "happy upbeat feel good",
+            sad: "sad melancholy emotional",
+            energetic: "energetic pump up workout",
+            calm: "calm peaceful relaxing chill",
+          };
+
+          const searchTerm = moodSearchTerms[mood] || moodSearchTerms.calm;
+          console.log("Searching playlists for:", searchTerm);
+
+          // Search for playlists
+          const playlistResponse = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+              searchTerm
+            )}&type=playlist&limit=3`,
+            {
+              headers: {
+                Authorization: "Bearer " + spotifyAccessToken,
+              },
+            }
+          );
+
+          if (!playlistResponse.ok) {
+            console.error("Playlist search failed:", playlistResponse.status);
+            throw new Error("Playlist search failed");
+          }
+
+          const playlistData = await playlistResponse.json();
+          console.log("Playlists found:", playlistData);
+
+          if (
+            !playlistData.playlists ||
+            playlistData.playlists.items.length === 0
+          ) {
+            console.log("No playlists found");
+            return [];
+          }
+
+          // Get tracks from the first playlist
+          const playlist = playlistData.playlists.items[0];
+          console.log("Getting tracks from playlist:", playlist.name);
+
+          const tracksResponse = await fetch(
+            `https://api.spotify.com/v1/playlists/${playlist.id}/tracks?limit=9`,
+            {
+              headers: {
+                Authorization: "Bearer " + spotifyAccessToken,
+              },
+            }
+          );
+
+          if (!tracksResponse.ok) {
+            console.error("Tracks fetch failed:", tracksResponse.status);
+            throw new Error("Tracks fetch failed");
+          }
+
+          const tracksData = await tracksResponse.json();
+          console.log("Tracks data:", tracksData);
+
+          const tracks = tracksData.items
+            .map((item) => item.track)
+            .filter((track) => track);
+          console.log("Final tracks count:", tracks.length);
+
+          return tracks;
+        } catch (error) {
+          console.error("Error getting recommendations:", error);
+          return [];
+        }
+      }
+      async function searchSpotifyTracks(artistName, mood) {
+        if (!spotifyAccessToken) {
+          await getSpotifyToken();
+        }
+
+        try {
+          // Search for the artist
+          const searchResponse = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+              artistName
+            )}&type=artist&limit=1`,
+            {
+              headers: {
+                Authorization: "Bearer " + spotifyAccessToken,
+              },
+            }
+          );
+
+          if (!searchResponse.ok) {
+            throw new Error("Artist search failed");
+          }
+
+          const searchData = await searchResponse.json();
+
+          if (!searchData.artists || searchData.artists.items.length === 0) {
+            console.log(`No artist found for: ${artistName}`);
+            return [];
+          }
+
+          const artistId = searchData.artists.items[0].id;
+
+          // Get artist's top tracks
+          const tracksResponse = await fetch(
+            `https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=US`,
+            {
+              headers: {
+                Authorization: "Bearer " + spotifyAccessToken,
+              },
+            }
+          );
+
+          if (!tracksResponse.ok) {
+            throw new Error("Tracks fetch failed");
+          }
+
+          const tracksData = await tracksResponse.json();
+
+          // Return top 3 tracks
+          return tracksData.tracks.slice(0, 3);
+        } catch (error) {
+          console.error("Error searching Spotify:", error);
+          return [];
+        }
+      }
+
+      // REAL mood detection using Google Vision API!
+      async function detectMoodFromImage(imageDataUrl) {
+        try {
+          // Convert data URL to base64 (remove the data:image/png;base64, part)
+          const base64Image = imageDataUrl.split(",")[1];
+
+          // Call Google Vision API
+          const response = await fetch(
+            `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                requests: [
+                  {
+                    image: { content: base64Image },
+                    features: [
+                      { type: "LABEL_DETECTION", maxResults: 10 },
+                      { type: "IMAGE_PROPERTIES" },
+                      { type: "FACE_DETECTION", maxResults: 5 },
+                    ],
+                  },
+                ],
+              }),
+            }
+          );
+
+          const data = await response.json();
+          console.log("Google Vision Response:", data);
+
+          if (!data.responses || !data.responses[0]) {
+            throw new Error("No response from Vision API");
+          }
+
+          const result = data.responses[0];
+
+          // Analyze the results
+          let mood = "calm";
+          let moodScore = {
+            happy: 0,
+            sad: 0,
+            energetic: 0,
+            calm: 0,
+          };
+
+          // 1. Check face emotions
+          if (result.faceAnnotations && result.faceAnnotations.length > 0) {
+            const face = result.faceAnnotations[0];
+            if (
+              face.joyLikelihood === "VERY_LIKELY" ||
+              face.joyLikelihood === "LIKELY"
+            ) {
+              moodScore.happy += 3;
+            }
+            if (
+              face.sorrowLikelihood === "VERY_LIKELY" ||
+              face.sorrowLikelihood === "LIKELY"
+            ) {
+              moodScore.sad += 3;
+            }
+            if (
+              face.angerLikelihood === "VERY_LIKELY" ||
+              face.angerLikelihood === "LIKELY"
+            ) {
+              moodScore.energetic += 2;
+            }
+          }
+
+          // 2. Check labels (what's in the image)
+          if (result.labelAnnotations) {
+            const labels = result.labelAnnotations.map((l) =>
+              l.description.toLowerCase()
+            );
+            console.log("Labels detected:", labels);
+
+            // Happy keywords
+            const happyKeywords = [
+              "fun",
+              "party",
+              "celebration",
+              "smile",
+              "joy",
+              "happy",
+              "laugh",
+              "sunshine",
+              "bright",
+            ];
+            // Sad keywords
+            const sadKeywords = [
+              "rain",
+              "dark",
+              "alone",
+              "melancholy",
+              "sad",
+              "cry",
+              "lonely",
+              "gray",
+            ];
+            // Energetic keywords
+            const energeticKeywords = [
+              "sport",
+              "dance",
+              "music",
+              "festival",
+              "crowd",
+              "action",
+              "concert",
+              "active",
+            ];
+            // Calm keywords
+            const calmKeywords = [
+              "nature",
+              "sky",
+              "water",
+              "peaceful",
+              "serene",
+              "calm",
+              "quiet",
+              "sunset",
+              "beach",
+              "forest",
+            ];
+
+            labels.forEach((label) => {
+              if (happyKeywords.some((k) => label.includes(k)))
+                moodScore.happy += 1;
+              if (sadKeywords.some((k) => label.includes(k)))
+                moodScore.sad += 1;
+              if (energeticKeywords.some((k) => label.includes(k)))
+                moodScore.energetic += 1;
+              if (calmKeywords.some((k) => label.includes(k)))
+                moodScore.calm += 1;
+            });
+          }
+
+          // 3. Check dominant colors
+          if (
+            result.imagePropertiesAnnotation &&
+            result.imagePropertiesAnnotation.dominantColors
+          ) {
+            const colors =
+              result.imagePropertiesAnnotation.dominantColors.colors;
+            const topColor = colors[0].color;
+
+            // Analyze color mood
+            const brightness =
+              (topColor.red + topColor.green + topColor.blue) / 3;
+            const isWarm = topColor.red > topColor.blue;
+
+            if (brightness > 180) {
+              moodScore.happy += 1;
+              moodScore.energetic += 0.5;
+            } else if (brightness < 100) {
+              moodScore.sad += 1;
+              moodScore.calm += 0.5;
+            }
+
+            if (isWarm) {
+              moodScore.energetic += 0.5;
+            } else {
+              moodScore.calm += 0.5;
+            }
+          }
+
+          // Determine final mood
+          console.log("Mood scores:", moodScore);
+
+          // Find the mood with highest score
+          let maxScore = -1;
+          let maxMood = "calm";
+          for (let key in moodScore) {
+            if (moodScore[key] > maxScore) {
+              maxScore = moodScore[key];
+              maxMood = key;
+            }
+          }
+          mood = maxMood;
+          console.log("Final mood selected:", mood);
+
+          const moodDescriptions = {
+            happy: "Your image radiates positive vibes and joy! ☀️",
+            calm: "This image has a peaceful and serene atmosphere. 🌙",
+            energetic: "High energy and vibrant vibes detected! ⚡",
+            sad: "This image has a melancholic and introspective feel. 🌧️",
+          };
+
+          return {
+            mood: mood,
+            description: moodDescriptions[mood],
+            details: result.labelAnnotations
+              ? result.labelAnnotations
+                  .slice(0, 5)
+                  .map((l) => l.description)
+                  .join(", ")
+              : "",
+          };
+        } catch (error) {
+          console.error("Error with Google Vision API:", error);
+          // Fallback to random if Vision API fails
+          const moods = ["happy", "calm", "energetic", "sad"];
+          const randomMood = moods[Math.floor(Math.random() * moods.length)];
+          return {
+            mood: randomMood,
+            description:
+              "Could not analyze image automatically, using random mood.",
+            details: "",
+          };
+        }
+      }
+
+      // Image upload preview
+      const fileUpload = document.getElementById("file-upload");
+      const fileImage = document.getElementById("file-image");
+      const startDiv = document.getElementById("start");
+      const analyzeBtn = document.getElementById("analyze-btn");
+      const uploaderLabel = document.querySelector(".uploader label");
+
+      fileUpload.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith("image/")) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            fileImage.src = e.target.result;
+            fileImage.classList.remove("hidden");
+            startDiv.classList.add("hidden");
+            checkFormComplete();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Drag and drop functionality
+      uploaderLabel.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        uploaderLabel.classList.add("hover");
+      });
+
+      uploaderLabel.addEventListener("dragleave", function (e) {
+        uploaderLabel.classList.remove("hover");
+      });
+
+      uploaderLabel.addEventListener("drop", function (e) {
+        e.preventDefault();
+        uploaderLabel.classList.remove("hover");
+
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            fileImage.src = e.target.result;
+            fileImage.classList.remove("hidden");
+            startDiv.classList.add("hidden");
+            checkFormComplete();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Check if form is complete
+      const artistInputs = [
+        document.getElementById("artist1"),
+        document.getElementById("artist2"),
+        document.getElementById("artist3"),
+      ];
+
+      artistInputs.forEach((input) => {
+        input.addEventListener("input", checkFormComplete);
+      });
+
+      // Listen to surprise mode checkbox
+      document
+        .getElementById("surprise-mode")
+        .addEventListener("change", checkFormComplete);
+
+      function checkFormComplete() {
+        const hasImage = !fileImage.classList.contains("hidden");
+        const surpriseMode = document.getElementById("surprise-mode").checked;
+        const hasArtist = artistInputs[0].value.trim() !== "";
+
+        // Enable button if: (has image) AND (surprise mode OR has at least one artist)
+        if (hasImage && (surpriseMode || hasArtist)) {
+          analyzeBtn.disabled = false;
+        } else {
+          analyzeBtn.disabled = true;
+        }
+      }
+
+      // Analyze button click - THE MAIN FUNCTION!
+      analyzeBtn.addEventListener("click", async function () {
+        // Show loading state
+        analyzeBtn.classList.add("loading");
+        analyzeBtn.innerHTML =
+          '✨ Analyzing...<span class="loading-spinner"></span>';
+        analyzeBtn.disabled = true;
+
+        try {
+          // 1. Get Spotify token first
+          await getSpotifyToken();
+
+          // 2. Detect mood from image
+          const imageData = fileImage.src;
+          const moodResult = await detectMoodFromImage(imageData);
+
+          if (!moodResult || !moodResult.mood) {
+            throw new Error("Failed to detect mood from image");
+          }
+
+          // 3. Get artists from input
+          const artists = artistInputs
+            .map((input) => input.value.trim())
+            .filter((artist) => artist !== "");
+
+          // 4. Search Spotify for songs
+          const allTracks = [];
+          for (const artist of artists) {
+            const tracks = await searchSpotifyTracks(artist, moodResult.mood);
+            allTracks.push(...tracks);
+          }
+
+          // 5. Display results
+          document.getElementById("mood-text").textContent =
+            moodResult.mood.charAt(0).toUpperCase() + moodResult.mood.slice(1);
+          document.getElementById("mood-description").innerHTML =
+            moodResult.description +
+            (moodResult.details
+              ? `<br><small style="color: #888;">Detected: ${moodResult.details}</small>`
+              : "");
+
+          const songList = document.getElementById("song-list");
+          songList.innerHTML = "";
+
+          if (allTracks.length === 0) {
+            songList.innerHTML =
+              '<li style="padding: 1rem; color: #666;">No songs found. Try different artists!</li>';
+          } else {
+            allTracks.slice(0, 9).forEach((track) => {
+              const li = document.createElement("li");
+              li.className = "song-item";
+              li.innerHTML = `
+                            <div class="song-title">${track.name}</div>
+                            <div class="song-artist">${track.artists
+                              .map((a) => a.name)
+                              .join(", ")}</div>
+                            <a href="${
+                              track.external_urls.spotify
+                            }" target="_blank" class="spotify-link">
+                                🎵 Listen on Spotify
+                            </a>
+                        `;
+              songList.appendChild(li);
+            });
+          }
+
+          // Show results
+          const resultsSection = document.getElementById("results");
+          resultsSection.classList.add("show");
+          resultsSection.scrollIntoView({ behavior: "smooth" });
+        } catch (error) {
+          console.error("Error:", error);
+          alert("Oops! Something went wrong: " + error.message);
+        } finally {
+          // Reset button
+          analyzeBtn.classList.remove("loading");
+          analyzeBtn.innerHTML = "✨ Analyze & Get Recommendations";
+          checkFormComplete();
+        }
+      });
+    </script>
+  </body>
+</html>
