@@ -7,7 +7,12 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["line-bot", "music", "spotify", "mood"],
+  "keywords": [
+    "line-bot",
+    "music",
+    "spotify",
+    "mood"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
