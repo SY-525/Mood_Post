@@ -116,6 +116,39 @@ async function handleEvent(event) {
   }
 }
 
+async function handleFollow(event, userId) {
+  return client.replyMessage({
+    replyToken: event.replyToken,
+    messages: [
+      {
+        type: "text",
+        text: translations.en.welcome,
+        quickReply: {
+          items: [
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: "English",
+                data: "lang=en",
+                displayText: "English 🇬🇧",
+              },
+            },
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: "中文",
+                data: "lang=zh",
+                displayText: "中文 🇹🇼",
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+}
 // Handle message events
 async function handleMessage(event, userId) {
   const message = event.message;
@@ -357,11 +390,27 @@ async function handleTextMessage(event, userId) {
     });
   }
 }
-
-// Handle postback events - user selected option
 async function handlePostback(event, userId) {
   const data = event.postback.data;
   const session = userSessions.get(userId);
+
+  // Handle language selection
+  if (data.startsWith('lang=')) {
+    const lang = data.split('=')[1];
+    userLanguages.set(userId, lang);
+    
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [
+        {
+          type: "text",
+          text: lang === 'en' 
+            ? "✅ Language set to English! Send me an image to get started! 📸"
+            : "✅ 語言已設為中文！傳送圖片給我開始吧！📸",
+        },
+      ],
+    });
+  }
 
   if (!session) {
     return client.replyMessage({
