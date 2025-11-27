@@ -22,7 +22,60 @@ const client = new line.messagingApi.MessagingApiClient({
 
 // Store user sessions (in production, use Redis or database)
 const userSessions = new Map();
+// Store user language preferences
+const userLanguages = new Map();
 
+// Translations
+const translations = {
+  en: {
+    welcome: "👋 Welcome to Mood Post Bot! 🎵\n\nI analyze your photos and recommend music that matches the vibe!\n\n📸 How it works:\n1. Send me any image\n2. I'll detect the mood (happy, calm, energetic, sad)\n3. Get personalized song recommendations!\n\nPlease choose your language:",
+    analyzing: "🎨 Analyzing your image... This will take a moment!",
+    moodDetected: "✨ {description}\n\nDetected mood: {mood} {emoji}\n\nDetails: {details}\n\n🎵 Reply with 'artist' to use your favorite artists, or reply with 'surprise' for random recommendations!",
+    askArtists: "🎤 Great! Tell me your favorite artists!\n\nYou can send multiple artists separated by commas.\nExample: Juice WRLD, Joji, Travis Scott",
+    searching: "🔍 Searching for music by {artists}...",
+    surprising: "✨ Let me surprise you with some {mood} vibes...",
+    recommendations: "🎵 Here are your {mood} music recommendations:\n\n",
+    sendImageFirst: "Please send me an image first so I can detect the mood! 📸",
+    anotherImage: "\n✨ Send me another image for more recommendations!",
+    happy: "Your image radiates happiness and positivity!",
+    sad: "Your image has a melancholic, introspective feel.",
+    energetic: "Your image is full of energy and excitement!",
+    calm: "Your image evokes peace and tranquility.",
+  },
+  zh: {
+    welcome: "👋 歡迎使用 Mood Post Bot！🎵\n\n我會分析你的照片，並推薦符合氛圍的音樂！\n\n📸 使用方式：\n1. 傳送任何圖片給我\n2. 我會偵測情緒（開心、平靜、充滿活力、悲傷）\n3. 獲得個人化的歌曲推薦！\n\n請選擇你的語言：",
+    analyzing: "🎨 正在分析你的圖片...請稍候！",
+    moodDetected: "✨ {description}\n\n偵測到的情緒：{mood} {emoji}\n\n細節：{details}\n\n🎵 回覆 'artist' 使用你最愛的歌手，或回覆 'surprise' 獲得隨機推薦！",
+    askArtists: "🎤 太好了！告訴我你最喜歡的歌手！\n\n你可以用逗號分隔多位歌手。\n例如：周杰倫, 五月天, 蔡依林",
+    searching: "🔍 正在搜尋 {artists} 的音樂...",
+    surprising: "✨ 讓我給你一些 {mood} 氛圍的音樂...",
+    recommendations: "🎵 這是你的 {mood} 音樂推薦：\n\n",
+    sendImageFirst: "請先傳送圖片給我，讓我偵測情緒！📸",
+    anotherImage: "\n✨ 傳送另一張圖片獲得更多推薦！",
+    happy: "你的圖片散發快樂與正能量！",
+    sad: "你的圖片帶有憂鬱、內省的感覺。",
+    energetic: "你的圖片充滿能量與興奮！",
+    calm: "你的圖片喚起平靜與寧靜。",
+  }
+};
+
+// Helper function to get user's language
+function getUserLanguage(userId) {
+  return userLanguages.get(userId) || 'en';
+}
+
+// Helper function to get translated text
+function t(userId, key, replacements = {}) {
+  const lang = getUserLanguage(userId);
+  let text = translations[lang][key] || translations.en[key];
+  
+  // Replace placeholders
+  Object.keys(replacements).forEach(key => {
+    text = text.replace(`{${key}}`, replacements[key]);
+  });
+  
+  return text;
+}
 // Middleware
 app.use("/webhook", line.middleware(config));
 app.use(express.json());
@@ -51,8 +104,9 @@ app.post("/webhook", async (req, res) => {
 async function handleEvent(event) {
   const userId = event.source.userId;
 
-  // Handle different event types
   switch (event.type) {
+    case "follow":
+      return handleFollow(event, userId);
     case "message":
       return handleMessage(event, userId);
     case "postback":
