@@ -1,8 +1,8 @@
-const express = require('express');
-const line = require('@line/bot-sdk');
-const axios = require('axios');
-const FormData = require('form-data');
-require('dotenv').config();
+const express = require("express");
+const line = require("@line/bot-sdk");
+const axios = require("axios");
+const FormData = require("form-data");
+require("dotenv").config();
 
 const app = express();
 
@@ -12,25 +12,29 @@ const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
+const blobClient = new line.messagingApi.MessagingApiBlobClient({
+  channelAccessToken: config.channelAccessToken,
+});
+
 const client = new line.messagingApi.MessagingApiClient({
-  channelAccessToken: config.channelAccessToken
+  channelAccessToken: config.channelAccessToken,
 });
 
 // Store user sessions (in production, use Redis or database)
 const userSessions = new Map();
 
 // Middleware
-app.use('/webhook', line.middleware(config));
+app.use("/webhook", line.middleware(config));
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static("public"));
 
 // Health check endpoint
-app.get('/', (req, res) => {
-  res.send('Mood Post LINE Bot is running! 🎵');
+app.get("/", (req, res) => {
+  res.send("Mood Post LINE Bot is running! 🎵");
 });
 
 // Webhook endpoint
-app.post('/webhook', async (req, res) => {
+app.post("/webhook", async (req, res) => {
   try {
     const events = req.body.events;
 
@@ -38,7 +42,7 @@ app.post('/webhook', async (req, res) => {
 
     res.status(200).end();
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error("Webhook error:", err);
     res.status(500).end();
   }
 });
@@ -49,9 +53,9 @@ async function handleEvent(event) {
 
   // Handle different event types
   switch (event.type) {
-    case 'message':
+    case "message":
       return handleMessage(event, userId);
-    case 'postback':
+    case "postback":
       return handlePostback(event, userId);
     default:
       return null;
@@ -63,88 +67,88 @@ async function handleMessage(event, userId) {
   const message = event.message;
 
   switch (message.type) {
-    case 'image':
+    case "image":
       return handleImageMessage(event, userId);
-    case 'text':
+    case "text":
       return handleTextMessage(event, userId);
     default:
       return client.replyMessage({
         replyToken: event.replyToken,
-        messages: [{
-          type: 'text',
-          text: 'Please send me an image to analyze! 📸'
-        }]
+        messages: [
+          {
+            type: "text",
+            text: "Please send me an image to analyze! 📸",
+          },
+        ],
       });
   }
 }
 
 // Handle image messages - detect mood
 async function handleImageMessage(event, userId) {
+  const messageId = event.message.id;
+  const replyToken = event.replyToken;
+
   try {
-    // Send processing message
+    // Reply immediately so token doesn't expire
     await client.replyMessage({
-      replyToken: event.replyToken,
-      messages: [{
-        type: 'text',
-        text: '🎨 Analyzing your image... This will take a moment!'
-      }]
+      replyToken: replyToken,
+      messages: [
+        {
+          type: "text",
+          text: "🎨 Analyzing your image... This will take a moment!",
+        },
+      ],
     });
 
-    // Get image content from LINE
-    const stream = await client.getMessageContent(event.message.id);
-    const imageBuffer = await streamToBuffer(stream);
+    // Get image content from LINE using blob client
+    const blobClient = new line.messagingApi.MessagingApiBlobClient({
+      channelAccessToken: config.channelAccessToken,
+    });
+
+    const imageBuffer = await blobClient.getMessageContent(messageId);
+
+    // Convert stream to buffer
+    const chunks = [];
+    for await (const chunk of imageBuffer) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
 
     // Analyze mood using Google Vision API
-    const mood = await analyzeMoodFromImage(imageBuffer);
+    const mood = await analyzeMoodFromImage(buffer);
 
     // Store mood in session
-    userSessions.set(userId, { mood, step: 'mood_detected' });
+    userSessions.set(userId, { mood, step: "mood_detected" });
 
-    // Send mood result with options
+    // Send mood result via push (since we already used reply token)
+    // Send mood result via push - SIMPLIFIED VERSION FOR TESTING
     await client.pushMessage({
       to: userId,
       messages: [
         {
-          type: 'text',
-          text: `✨ ${mood.description}\n\nDetected mood: ${mood.moodType.toUpperCase()} ${getMoodEmoji(mood.moodType)}\n\nDetails:\n${mood.details}`
+          type: "text",
+          text: `✨ ${
+            mood.description
+          }\n\nDetected mood: ${mood.moodType.toUpperCase()} ${getMoodEmoji(
+            mood.moodType
+          )}\n\nDetails: ${
+            mood.details
+          }\n\n🎵 Reply with "artist" to use your favorite artists, or reply with "surprise" for random recommendations!`,
         },
-        {
-          type: 'text',
-          text: '🎵 How would you like me to find music for you?',
-          quickReply: {
-            items: [
-              {
-                type: 'action',
-                action: {
-                  type: 'postback',
-                  label: '🎤 My Favorite Artists',
-                  data: 'action=artist_mode',
-                  displayText: '🎤 My Favorite Artists'
-                }
-              },
-              {
-                type: 'action',
-                action: {
-                  type: 'postback',
-                  label: '✨ Surprise Me!',
-                  data: 'action=surprise_mode',
-                  displayText: '✨ Surprise Me!'
-                }
-              }
-            ]
-          }
-        }
-      ]
+      ],
     });
-
   } catch (error) {
-    console.error('Image handling error:', error);
+    console.error("Image handling error:", error);
+    // Send error via push
     await client.pushMessage({
       to: userId,
-      messages: [{
-        type: 'text',
-        text: '❌ Sorry, I had trouble analyzing your image. Please try again!'
-      }]
+      messages: [
+        {
+          type: "text",
+          text: "❌ Sorry, I had trouble analyzing your image. Please try again!",
+        },
+      ],
     });
   }
 }
@@ -152,67 +156,150 @@ async function handleImageMessage(event, userId) {
 // Handle text messages - artist input
 async function handleTextMessage(event, userId) {
   const session = userSessions.get(userId);
+  const text = event.message.text.toLowerCase().trim();
+
+  // Check for keywords even without session
+  if (text === "artist" || text === "artists") {
+    if (!session || !session.mood) {
+      return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [
+          {
+            type: "text",
+            text: "Please send me an image first so I can detect the mood! 📸",
+          },
+        ],
+      });
+    }
+
+    // Update session to wait for artists
+    userSessions.set(userId, { ...session, step: "waiting_for_artists" });
+
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [
+        {
+          type: "text",
+          text: "🎤 Great! Tell me your favorite artists!\n\nYou can send multiple artists separated by commas.\nExample: Juice WRLD, Joji, Travis Scott",
+        },
+      ],
+    });
+  }
+
+  if (text === "surprise") {
+    if (!session || !session.mood) {
+      return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [
+          {
+            type: "text",
+            text: "Please send me an image first so I can detect the mood! 📸",
+          },
+        ],
+      });
+    }
+
+    try {
+      await client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [
+          {
+            type: "text",
+            text: `✨ Let me surprise you with some ${session.mood.moodType} vibes...`,
+          },
+        ],
+      });
+
+      const recommendations = await getSurpriseRecommendations(
+        session.mood.moodType
+      );
+      userSessions.delete(userId);
+      await sendRecommendations(userId, recommendations, session.mood.moodType);
+    } catch (error) {
+      console.error("Surprise recommendation error:", error);
+      await client.pushMessage({
+        to: userId,
+        messages: [
+          {
+            type: "text",
+            text: "❌ Sorry, I had trouble finding music. Please try again!",
+          },
+        ],
+      });
+    }
+    return;
+  }
 
   if (!session) {
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{
-        type: 'text',
-        text: '👋 Hi! Send me an image and I\'ll recommend music based on its vibe! 📸🎵'
-      }]
+      messages: [
+        {
+          type: "text",
+          text: "👋 Hi! Send me an image and I'll recommend music based on its vibe! 📸🎵",
+        },
+      ],
     });
   }
 
-  if (session.step === 'waiting_for_artists') {
+  if (session.step === "waiting_for_artists") {
     try {
-      // Parse artists from text
       const artistsText = event.message.text;
-      const artists = artistsText.split(',').map(a => a.trim()).filter(a => a);
+      const artists = artistsText
+        .split(",")
+        .map((a) => a.trim())
+        .filter((a) => a);
 
       if (artists.length === 0) {
         return client.replyMessage({
           replyToken: event.replyToken,
-          messages: [{
-            type: 'text',
-            text: '❌ Please provide at least one artist name!'
-          }]
+          messages: [
+            {
+              type: "text",
+              text: "❌ Please provide at least one artist name!",
+            },
+          ],
         });
       }
 
-      // Get recommendations
       await client.replyMessage({
         replyToken: event.replyToken,
-        messages: [{
-          type: 'text',
-          text: `🔍 Searching for music by ${artists.join(', ')}...`
-        }]
+        messages: [
+          {
+            type: "text",
+            text: `🔍 Searching for music by ${artists.join(", ")}...`,
+          },
+        ],
       });
 
-      const recommendations = await getArtistRecommendations(artists, session.mood.moodType);
+      const recommendations = await getArtistRecommendations(
+        artists,
+        session.mood.moodType
+      );
 
-      // Clear session
       userSessions.delete(userId);
-
-      // Send recommendations
       await sendRecommendations(userId, recommendations, session.mood.moodType);
-
     } catch (error) {
-      console.error('Artist recommendation error:', error);
+      console.error("Artist recommendation error:", error);
       await client.pushMessage({
         to: userId,
-        messages: [{
-          type: 'text',
-          text: '❌ Sorry, I had trouble finding music. Please try again!'
-        }]
+        messages: [
+          {
+            type: "text",
+            text: "❌ Sorry, I had trouble finding music. Please try again!",
+          },
+        ],
       });
     }
   } else {
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{
-        type: 'text',
-        text: 'Please send me an image first! 📸'
-      }]
+      messages: [
+        {
+          type: "text",
+          text: "Please send me an image first! 📸",
+        },
+      ],
     });
   }
 }
@@ -225,52 +312,60 @@ async function handlePostback(event, userId) {
   if (!session) {
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{
-        type: 'text',
-        text: 'Session expired. Please send an image again! 📸'
-      }]
+      messages: [
+        {
+          type: "text",
+          text: "Session expired. Please send an image again! 📸",
+        },
+      ],
     });
   }
 
-  if (data === 'action=artist_mode') {
+  if (data === "action=artist_mode") {
     // Ask for artists
-    userSessions.set(userId, { ...session, step: 'waiting_for_artists' });
+    userSessions.set(userId, { ...session, step: "waiting_for_artists" });
 
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{
-        type: 'text',
-        text: '🎤 Great! Tell me your favorite artists!\n\nYou can send multiple artists separated by commas.\nExample: Taylor Swift, Ed Sheeran, The Weeknd'
-      }]
+      messages: [
+        {
+          type: "text",
+          text: "🎤 Great! Tell me your favorite artists!\n\nYou can send multiple artists separated by commas.\nExample: Taylor Swift, Ed Sheeran, The Weeknd",
+        },
+      ],
     });
-
-  } else if (data === 'action=surprise_mode') {
+  } else if (data === "action=surprise_mode") {
     try {
       // Get surprise recommendations based on mood
       await client.replyMessage({
         replyToken: event.replyToken,
-        messages: [{
-          type: 'text',
-          text: `✨ Let me surprise you with some ${session.mood.moodType} vibes...`
-        }]
+        messages: [
+          {
+            type: "text",
+            text: `✨ Let me surprise you with some ${session.mood.moodType} vibes...`,
+          },
+        ],
       });
 
-      const recommendations = await getSurpriseRecommendations(session.mood.moodType);
+      const recommendations = await getSurpriseRecommendations(
+        session.mood.moodType
+      );
 
       // Clear session
       userSessions.delete(userId);
 
       // Send recommendations
       await sendRecommendations(userId, recommendations, session.mood.moodType);
-
     } catch (error) {
-      console.error('Surprise recommendation error:', error);
+      console.error("Surprise recommendation error:", error);
       await client.pushMessage({
         to: userId,
-        messages: [{
-          type: 'text',
-          text: '❌ Sorry, I had trouble finding music. Please try again!'
-        }]
+        messages: [
+          {
+            type: "text",
+            text: "❌ Sorry, I had trouble finding music. Please try again!",
+          },
+        ],
       });
     }
   }
@@ -279,17 +374,19 @@ async function handlePostback(event, userId) {
 // ==================== MOOD DETECTION ====================
 
 async function analyzeMoodFromImage(imageBuffer) {
-  const base64Image = imageBuffer.toString('base64');
+  const base64Image = imageBuffer.toString("base64");
 
   const requestBody = {
-    requests: [{
-      image: { content: base64Image },
-      features: [
-        { type: 'LABEL_DETECTION', maxResults: 10 },
-        { type: 'FACE_DETECTION', maxResults: 5 },
-        { type: 'IMAGE_PROPERTIES', maxResults: 10 }
-      ]
-    }]
+    requests: [
+      {
+        image: { content: base64Image },
+        features: [
+          { type: "LABEL_DETECTION", maxResults: 10 },
+          { type: "FACE_DETECTION", maxResults: 5 },
+          { type: "IMAGE_PROPERTIES", maxResults: 10 },
+        ],
+      },
+    ],
   };
 
   const response = await axios.post(
@@ -306,26 +403,68 @@ function detectMood(visionResult) {
     happy: 0,
     sad: 0,
     energetic: 0,
-    calm: 0
+    calm: 0,
   };
 
   const moodKeywords = {
-    happy: ['fun', 'party', 'celebration', 'smile', 'joy', 'sunshine', 'bright', 'colorful', 'happy', 'cheerful'],
-    sad: ['rain', 'dark', 'alone', 'melancholy', 'cry', 'lonely', 'gray', 'gloomy', 'sad'],
-    energetic: ['sport', 'dance', 'music', 'festival', 'crowd', 'action', 'concert', 'energy', 'active'],
-    calm: ['nature', 'sky', 'water', 'peaceful', 'serene', 'sunset', 'beach', 'forest', 'calm', 'quiet']
+    happy: [
+      "fun",
+      "party",
+      "celebration",
+      "smile",
+      "joy",
+      "sunshine",
+      "bright",
+      "colorful",
+      "happy",
+      "cheerful",
+    ],
+    sad: [
+      "rain",
+      "dark",
+      "alone",
+      "melancholy",
+      "cry",
+      "lonely",
+      "gray",
+      "gloomy",
+      "sad",
+    ],
+    energetic: [
+      "sport",
+      "dance",
+      "music",
+      "festival",
+      "crowd",
+      "action",
+      "concert",
+      "energy",
+      "active",
+    ],
+    calm: [
+      "nature",
+      "sky",
+      "water",
+      "peaceful",
+      "serene",
+      "sunset",
+      "beach",
+      "forest",
+      "calm",
+      "quiet",
+    ],
   };
 
   const detectedLabels = [];
 
   // Analyze labels
   if (visionResult.labelAnnotations) {
-    visionResult.labelAnnotations.forEach(label => {
+    visionResult.labelAnnotations.forEach((label) => {
       const desc = label.description.toLowerCase();
       detectedLabels.push(desc);
 
-      Object.keys(moodKeywords).forEach(mood => {
-        if (moodKeywords[mood].some(keyword => desc.includes(keyword))) {
+      Object.keys(moodKeywords).forEach((mood) => {
+        if (moodKeywords[mood].some((keyword) => desc.includes(keyword))) {
           moodScores[mood] += label.score;
         }
       });
@@ -334,11 +473,17 @@ function detectMood(visionResult) {
 
   // Analyze faces
   if (visionResult.faceAnnotations && visionResult.faceAnnotations.length > 0) {
-    visionResult.faceAnnotations.forEach(face => {
-      if (face.joyLikelihood === 'VERY_LIKELY' || face.joyLikelihood === 'LIKELY') {
+    visionResult.faceAnnotations.forEach((face) => {
+      if (
+        face.joyLikelihood === "VERY_LIKELY" ||
+        face.joyLikelihood === "LIKELY"
+      ) {
         moodScores.happy += 0.5;
       }
-      if (face.sorrowLikelihood === 'VERY_LIKELY' || face.sorrowLikelihood === 'LIKELY') {
+      if (
+        face.sorrowLikelihood === "VERY_LIKELY" ||
+        face.sorrowLikelihood === "LIKELY"
+      ) {
         moodScores.sad += 0.5;
       }
     });
@@ -349,7 +494,8 @@ function detectMood(visionResult) {
     const colors = visionResult.imagePropertiesAnnotation.dominantColors.colors;
     if (colors && colors.length > 0) {
       const dominantColor = colors[0].color;
-      const brightness = (dominantColor.red + dominantColor.green + dominantColor.blue) / 3;
+      const brightness =
+        (dominantColor.red + dominantColor.green + dominantColor.blue) / 3;
 
       if (brightness > 180) {
         moodScores.happy += 0.3;
@@ -369,10 +515,10 @@ function detectMood(visionResult) {
   }
 
   // Determine dominant mood
-  let dominantMood = 'calm';
+  let dominantMood = "calm";
   let maxScore = 0;
 
-  Object.keys(moodScores).forEach(mood => {
+  Object.keys(moodScores).forEach((mood) => {
     if (moodScores[mood] > maxScore) {
       maxScore = moodScores[mood];
       dominantMood = mood;
@@ -383,14 +529,14 @@ function detectMood(visionResult) {
     happy: "Your image radiates happiness and positivity!",
     sad: "Your image has a melancholic, introspective feel.",
     energetic: "Your image is full of energy and excitement!",
-    calm: "Your image evokes peace and tranquility."
+    calm: "Your image evokes peace and tranquility.",
   };
 
   return {
     moodType: dominantMood,
     description: moodDescriptions[dominantMood],
     scores: moodScores,
-    details: `Detected: ${detectedLabels.slice(0, 5).join(', ')}`
+    details: `Detected: ${detectedLabels.slice(0, 5).join(", ")}`,
   };
 }
 
@@ -399,16 +545,16 @@ function detectMood(visionResult) {
 async function getSpotifyToken() {
   const credentials = Buffer.from(
     `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-  ).toString('base64');
+  ).toString("base64");
 
   const response = await axios.post(
-    'https://accounts.spotify.com/api/token',
-    'grant_type=client_credentials',
+    "https://accounts.spotify.com/api/token",
+    "grant_type=client_credentials",
     {
       headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
     }
   );
 
@@ -419,13 +565,16 @@ async function getArtistRecommendations(artists, mood) {
   const token = await getSpotifyToken();
   const recommendations = [];
 
-  for (const artistName of artists.slice(0, 3)) { // Limit to 3 artists
+  for (const artistName of artists.slice(0, 3)) {
+    // Limit to 3 artists
     try {
       // Search for artist
       const searchResponse = await axios.get(
-        `https://api.spotify.com/v1/search?q=${encodeURIComponent(artistName)}&type=artist&limit=1`,
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+          artistName
+        )}&type=artist&limit=1`,
         {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -436,16 +585,16 @@ async function getArtistRecommendations(artists, mood) {
         const tracksResponse = await axios.get(
           `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=US`,
           {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        tracksResponse.data.tracks.slice(0, 3).forEach(track => {
+        tracksResponse.data.tracks.slice(0, 3).forEach((track) => {
           recommendations.push({
             name: track.name,
             artist: track.artists[0].name,
             url: track.external_urls.spotify,
-            image: track.album.images[0]?.url
+            image: track.album.images[0]?.url,
           });
         });
       }
@@ -461,19 +610,21 @@ async function getSurpriseRecommendations(mood) {
   const token = await getSpotifyToken();
 
   const moodQueries = {
-    happy: 'happy upbeat feel good',
-    sad: 'sad melancholy emotional',
-    energetic: 'energetic pump up workout',
-    calm: 'calm peaceful relaxing chill'
+    happy: "happy upbeat feel good",
+    sad: "sad melancholy emotional",
+    energetic: "energetic pump up workout",
+    calm: "calm peaceful relaxing chill",
   };
 
-  const query = moodQueries[mood] || 'popular music';
+  const query = moodQueries[mood] || "popular music";
 
   // Search for playlists
   const playlistResponse = await axios.get(
-    `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist&limit=3`,
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+      query
+    )}&type=playlist&limit=3`,
     {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     }
   );
 
@@ -485,22 +636,22 @@ async function getSurpriseRecommendations(mood) {
         const tracksResponse = await axios.get(
           `https://api.spotify.com/v1/playlists/${playlist.id}/tracks?limit=5`,
           {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        tracksResponse.data.items.forEach(item => {
+        tracksResponse.data.items.forEach((item) => {
           if (item.track && recommendations.length < 9) {
             recommendations.push({
               name: item.track.name,
-              artist: item.track.artists[0]?.name || 'Unknown',
+              artist: item.track.artists[0]?.name || "Unknown",
               url: item.track.external_urls.spotify,
-              image: item.track.album.images[0]?.url
+              image: item.track.album.images[0]?.url,
             });
           }
         });
       } catch (error) {
-        console.error('Error fetching playlist tracks:', error.message);
+        console.error("Error fetching playlist tracks:", error.message);
       }
     }
   }
@@ -512,10 +663,12 @@ async function sendRecommendations(userId, recommendations, mood) {
   if (recommendations.length === 0) {
     return client.pushMessage({
       to: userId,
-      messages: [{
-        type: 'text',
-        text: '😕 Sorry, I couldn\'t find any recommendations. Please try again!'
-      }]
+      messages: [
+        {
+          type: "text",
+          text: "😕 Sorry, I couldn't find any recommendations. Please try again!",
+        },
+      ],
     });
   }
 
@@ -528,14 +681,16 @@ async function sendRecommendations(userId, recommendations, mood) {
     messageText += `   🎧 ${track.url}\n\n`;
   });
 
-  messageText += '\n✨ Send me another image for more recommendations!';
+  messageText += "\n✨ Send me another image for more recommendations!";
 
   await client.pushMessage({
     to: userId,
-    messages: [{
-      type: 'text',
-      text: messageText
-    }]
+    messages: [
+      {
+        type: "text",
+        text: messageText,
+      },
+    ],
   });
 }
 
@@ -544,20 +699,20 @@ async function sendRecommendations(userId, recommendations, mood) {
 function streamToBuffer(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    stream.on('data', chunk => chunks.push(chunk));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on("data", (chunk) => chunks.push(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
   });
 }
 
 function getMoodEmoji(mood) {
   const emojis = {
-    happy: '😊',
-    sad: '😔',
-    energetic: '⚡',
-    calm: '😌'
+    happy: "😊",
+    sad: "😔",
+    energetic: "⚡",
+    calm: "😌",
   };
-  return emojis[mood] || '🎵';
+  return emojis[mood] || "🎵";
 }
 
 // Start server
